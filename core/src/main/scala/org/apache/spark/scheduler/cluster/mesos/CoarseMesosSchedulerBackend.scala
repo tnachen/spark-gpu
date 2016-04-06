@@ -270,7 +270,7 @@ private[spark] class CoarseMesosSchedulerBackend(
             // Gather cpu resources from the available resources and use them in the task.
             val (remainingResources, cpuResourcesToUse) =
               partitionResources(offer.getResourcesList, "cpus", cpusToUse)
-            val (_, memResourcesToUse) =
+            val (remainingResources2, memResourcesToUse) =
               partitionResources(remainingResources.asJava, "mem", calculateTotalMemory(sc))
             val taskBuilder = MesosTaskInfo.newBuilder()
               .setTaskId(TaskID.newBuilder().setValue(taskId.toString).build())
@@ -279,6 +279,12 @@ private[spark] class CoarseMesosSchedulerBackend(
               .setName("Task " + taskId)
               .addAllResources(cpuResourcesToUse.asJava)
               .addAllResources(memResourcesToUse.asJava)
+            val gpus = getResource(offer.getResourcesList, "gpu").toInt
+            if (gpus >= 1) {
+              val _, gpuResourcesToUse =
+                partitionResources(remainingResources2.asJava, "gpu", 1)
+              taskBuilder.addAllResources(gpuResourcesToUse)
+            }
 
             sc.conf.getOption("spark.mesos.executor.docker.image").foreach { image =>
               MesosSchedulerBackendUtil
